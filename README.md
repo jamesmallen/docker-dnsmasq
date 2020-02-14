@@ -2,24 +2,38 @@
 
 This is a fork of [andyshinn/dnsmasq] that removes the need for `NET_ADMIN` capabilities.
 
-It's a [dnsmasq][dnsmasq] Docker image. It is only 6 MB in size. It is just an `ENTRYPOINT` to the `dnsmasq` binary. Can you smell what the rock is cookin'?
+It's a [dnsmasq][dnsmasq] Docker image. It is only 6 MB in size. It is just an `ENTRYPOINT` to the `dnsmasq` binary.
+
+## Quick Start
+
+To resolve the `dev.localhost` domain (and all subdomains) to `localhost` (`127.0.0.1`):
+
+```console
+docker run -p 53:53/tcp -p 53:53/udp jmaroeder/dnsmasq --address=/dev.localhost/127.0.0.1
+```
+
+This will send a request for `redis.dev.localhost` to `127.0.0.1`.
+
 
 ## Usage
 
-Available tags include:
+### Tags
 
-* `jamesmallen/dnsmasq:latest`: same as 2.78
-* `jamesmallen/dnsmasq:2.78`: dnsmasq 2.78 based on Alpine 3.7
+* `jmaroeder/dnsmasq:latest`: same as 2.80
+* `jmaroeder/dnsmasq:2.80`: dnsmasq 2.80 based on Alpine 3.11
+* `jmaroeder/dnsmasq:2.78`: dnsmasq 2.78 based on Alpine 3.7
 
-Start the image with `docker run -p 53:53/tcp -p 53:53/udp jamesmallen/dnsmasq`.
+### Command-line
 
-The configuration is all handled on the command line (no wrapper scripts here). The `ENTRYPOINT` is `dnsmasq --keep-in-foreground --user=root` to keep it running in the foreground. If you wanted to send requests for an internal domain (such as Consul) you can forward the requests upstream using something like `docker run -p 53:53/tcp -p 53:53/udp jamesmallen/dnsmasq --address=/consul/10.17.0.2`. This will send a request for `redis.service.consul` to `10.17.0.2`.
+The configuration is all handled on the command line (no wrapper scripts here). The `ENTRYPOINT` is `dnsmasq --keep-in-foreground --user=root` to keep it running in the foreground.
+
+To send requests for an internal domain (such as Consul) you can forward the requests upstream using something like `docker run -p 53:53/tcp -p 53:53/udp jmaroeder/dnsmasq --address=/consul/10.17.0.2`. This will send a request for `redis.service.consul` to `10.17.0.2`.
 
 As this is a very barebones entrypoint with just enough to run in the foreground, there is no logging enabled by default. To send logging to stdout you can add `--log-facility=-` as an option.
 
 ## Advanced usage
 
-You can run multiple containers with this image if you don't force the port to `53` on the host. Here is a script that can be used to dynamically start a container that will run alongside other `dnsmasq` instances and generate a `resolver` file for use on Mac OSX:
+You can run multiple containers with this image if you don't force the port to `53` on the host. Here is a script that can be used to dynamically start a container that will run alongside other `dnsmasq` instances and generate a `resolver` file for use on macOS:
 
 ```bash
 #!/usr/bin/env bash
@@ -27,8 +41,8 @@ set -e
 
 DNS_SUFFIX=dev.localhost
 
-instance_id=$(docker run -p 53 -p 53/udp jamesmallen/dnsmasq --address=/${DNS_SUFFIX}/127.0.0.1)
-dnsmasq_port=docker inspect --format='{{(index (index .NetworkSettings.Ports "53/udp") 0).HostPort}}' $instance_id
+instance_id=$(docker run -p 53 -p 53/udp -d jmaroeder/dnsmasq --address=/${DNS_SUFFIX}/127.0.0.1)
+dnsmasq_port=$(docker inspect --format='{{(index (index .NetworkSettings.Ports "53/udp") 0).HostPort}}' $instance_id)
 resolver_file="/etc/resolver/${DNS_SUFFIX}"
 resolver_contents="$(cat << EOF
 domain ${DNS_SUFFIX}
@@ -46,7 +60,6 @@ if [[ ! -f ${resolver_file} || $(< ${resolver_file}) != "${resolver_contents}" ]
     fi
     echo "${resolver_contents}" | sudo tee "${resolver_file}"
 fi
-
 ```
 
 [andyshinn/dnsmasq]: https://github.com/andyshinn/docker-dnsmasq
